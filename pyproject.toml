@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "byproxy"
+version = "0.1.0"
+description = "A console HTTP/HTTPS intercepting proxy, inspired by Burp Suite and Charles."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "anton" }]
+keywords = ["proxy", "http", "https", "mitm", "security", "cli"]
+dependencies = [
+    "rich>=13.0",
+    "typer>=0.12",
+    "cryptography>=42.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+byproxy = "byproxy.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/anton/byproxy"
+
+[tool.setuptools.packages.find]
+include = ["byproxy*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
