@@ -28,7 +28,11 @@ HELP = """
   [cyan]filter <texto>[/cyan]        lista apenas flows cuja URL contém o texto
   [cyan]intercept on|off[/cyan]      liga/desliga a pausa de requisições
   [cyan]queue[/cyan]                 lista as requisições pausadas
-  [cyan]edit <#>[/cyan]              edita uma requisição pausada no editor
+  [cyan]edit <#>[/cyan]              edita uma requisição pausada no editor externo
+  [cyan]set-method <#> <m>[/cyan]    troca o método de uma requisição pausada
+  [cyan]set-path <#> <caminho>[/cyan] troca o caminho/query de uma requisição pausada
+  [cyan]set-header <#> <nome> [valor][/cyan]  define (ou remove, sem valor) um header
+  [cyan]set-body <#> [texto][/cyan]  troca o corpo (vazio limpa o corpo)
   [cyan]forward <#>[/cyan] | [cyan]forward all[/cyan]   encaminha requisição(ões) pausada(s)
   [cyan]drop <#>[/cyan]              descarta uma requisição pausada
   [cyan]save <arquivo>[/cyan]        salva a sessão em JSON
@@ -105,6 +109,14 @@ class Console:
             ui.render_pending(self.interceptor.pending_list())
         elif command == "edit":
             self._edit(rest)
+        elif command == "set-method":
+            self._set_method(rest)
+        elif command == "set-path":
+            self._set_path(rest)
+        elif command == "set-header":
+            self._set_header(rest)
+        elif command == "set-body":
+            self._set_body(rest)
         elif command == "forward":
             self._forward(rest)
         elif command == "drop":
@@ -166,6 +178,73 @@ class Console:
         pending.request = new_request
         console.print(f"[green]requisição #{pending.flow.id} atualizada.[/green] Use 'forward {pending.flow.id}'.")
 
+    # ------------------------------------------------------------------
+    # Edição inline: alterações rápidas sem sair do console.
+    # ------------------------------------------------------------------
+    def _pending_or_warn(self, token: str):
+        pending = self.interceptor.get(_as_id(token))
+        if pending is None:
+            console.print("[yellow]nenhuma requisição pausada com esse número.[/yellow]")
+        return pending
+
+    def _set_method(self, rest: str) -> None:
+        flow_id, _, method = rest.partition(" ")
+        method = method.strip()
+        if not flow_id or not method:
+            console.print("[yellow]uso: set-method <#> <método>[/yellow]")
+            return
+        pending = self._pending_or_warn(flow_id)
+        if pending is None:
+            return
+        pending.request.method = method.upper()
+        self._touched(pending)
+
+    def _set_path(self, rest: str) -> None:
+        flow_id, _, path = rest.partition(" ")
+        path = path.strip()
+        if not flow_id or not path:
+            console.print("[yellow]uso: set-path <#> <caminho>[/yellow]")
+            return
+        pending = self._pending_or_warn(flow_id)
+        if pending is None:
+            return
+        pending.request.path = path
+        self._touched(pending)
+
+    def _set_header(self, rest: str) -> None:
+        flow_id, _, tail = rest.partition(" ")
+        name, _, value = tail.partition(" ")
+        name = name.strip()
+        value = value.strip()
+        if not flow_id or not name:
+            console.print("[yellow]uso: set-header <#> <nome> [valor]  (sem valor, remove o header)[/yellow]")
+            return
+        pending = self._pending_or_warn(flow_id)
+        if pending is None:
+            return
+        pending.request.headers = _set_header(pending.request.headers, name, value)
+        acao = "removido" if not value else "definido"
+        console.print(f"[green]header '{name}' {acao}[/green] na requisição #{pending.flow.id}.")
+
+    def _set_body(self, rest: str) -> None:
+        flow_id, _, body_text = rest.partition(" ")
+        if not flow_id:
+            console.print("[yellow]uso: set-body <#> [texto][/yellow]")
+            return
+        pending = self._pending_or_warn(flow_id)
+        if pending is None:
+            return
+        body = body_text.encode("utf-8")
+        pending.request.body = body
+        pending.request.headers = _fix_content_length(pending.request.headers, len(body))
+        self._touched(pending)
+
+    def _touched(self, pending) -> None:
+        console.print(
+            f"[green]requisição #{pending.flow.id} atualizada.[/green] "
+            f"Use 'forward {pending.flow.id}' quando terminar de editar."
+        )
+
     def _forward(self, rest: str) -> None:
         if rest == "all":
             count = self.interceptor.forward_all()
@@ -205,6 +284,26 @@ def _as_id(rest: str) -> int:
         return int(rest.strip())
     except ValueError as exc:
         raise ValueError(f"número inválido: {rest!r}") from exc
+
+
+def _set_header(headers: list[tuple[str, str]], name: str, value: str) -> list[tuple[str, str]]:
+    """Define um header; valor vazio remove. Preserva a ordem e, quando o
+    header já existe, substitui no lugar (sem diferenciar maiúsculas)."""
+    low = name.lower()
+    without = [(k, v) for k, v in headers if k.lower() != low]
+    if not value:
+        return without
+    result: list[tuple[str, str]] = []
+    replaced = False
+    for key, old in headers:
+        if key.lower() == low and not replaced:
+            result.append((name, value))
+            replaced = True
+        elif key.lower() != low:
+            result.append((key, old))
+    if not replaced:
+        result.append((name, value))
+    return result
 
 
 def _fix_content_length(headers: list[tuple[str, str]], length: int) -> list[tuple[str, str]]:
