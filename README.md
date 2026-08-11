@@ -64,10 +64,15 @@ byproxy> inspect 3          # detalhe do flow 3
 byproxy> filter login       # só URLs com "login"
 byproxy> intercept on       # passa a pausar requisições
 byproxy> queue              # lista as pausadas
-byproxy> edit 5             # edita a requisição 5 no editor
+byproxy> set-header 5 User-Agent curl/8.0   # edita direto no console
+byproxy> set-body 5 {"user":"admin"}
 byproxy> forward 5          # encaminha
 byproxy> save sessao.json   # salva a sessão
 ```
+
+A requisição pausada pode ser editada direto no console (`set-method`,
+`set-path`, `set-header`, `set-body`) ou aberta por completo num editor
+externo com `edit <#>`.
 
 ### HTTPS
 
@@ -100,7 +105,11 @@ curl -x http://127.0.0.1:8080 http://127.0.0.1:9000/
 | `filter <texto>` | filtra o histórico pela URL |
 | `intercept on\|off` | liga/desliga a pausa de requisições |
 | `queue` | lista as requisições pausadas |
-| `edit <#>` | edita uma requisição pausada |
+| `edit <#>` | edita uma requisição pausada no editor externo |
+| `set-method <#> <m>` | troca o método da requisição pausada |
+| `set-path <#> <caminho>` | troca o caminho/query da requisição pausada |
+| `set-header <#> <nome> [valor]` | define (ou remove, sem valor) um header |
+| `set-body <#> [texto]` | troca o corpo (vazio limpa) |
 | `forward <#>` / `forward all` | encaminha requisição(ões) pausada(s) |
 | `drop <#>` | descarta uma requisição pausada |
 | `save` / `load <arquivo>` | salva/carrega a sessão em JSON |
