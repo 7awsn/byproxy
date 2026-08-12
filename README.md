@@ -1,5 +1,7 @@
 # byproxy
 
+![tests](https://github.com/7awsn/byproxy/actions/workflows/tests.yml/badge.svg)
+
 Um proxy HTTP/HTTPS interceptador que roda inteiro no terminal. A ideia é a
 mesma de ferramentas como Burp Suite e Charles! Ver, pausar e modificar o
 tráfego entre um cliente e um servidor — mas sem interface gráfica: tudo por
