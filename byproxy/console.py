@@ -14,7 +14,7 @@ import threading
 
 from . import ui
 from .ca import CertificateAuthority
-from .flow import Request
+from .flow import Flow, Request
 from .http_parser import parse_editable, request_to_editable
 from .interceptor import Interceptor
 from .proxy import ProxyServer
@@ -138,11 +138,18 @@ class Console:
 
     # ------------------------------------------------------------------
     def _inspect(self, rest: str) -> None:
-        flow = self.store.get(_as_id(rest))
-        if flow is None:
-            console.print("[yellow]flow não encontrado.[/yellow]")
+        flow_id = _as_id(rest)
+        flow = self.store.get(flow_id)
+        if flow is not None:
+            ui.render_flow(flow)
             return
-        ui.render_flow(flow)
+        # Ainda não está no histórico? Pode estar pausada na interceptação.
+        pending = self.interceptor.get(flow_id)
+        if pending is not None:
+            console.print(f"[yellow]#{flow_id} está pausada (ainda não enviada).[/yellow]")
+            ui.render_flow(Flow(id=flow_id, request=pending.request))
+            return
+        console.print("[yellow]flow não encontrado.[/yellow]")
 
     def _intercept(self, rest: str) -> None:
         if rest == "on":
