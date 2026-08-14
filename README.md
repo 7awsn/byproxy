@@ -2,130 +2,132 @@
 
 ![tests](https://github.com/7awsn/byproxy/actions/workflows/tests.yml/badge.svg)
 
-Um proxy HTTP/HTTPS interceptador que roda inteiro no terminal. A ideia é a
-mesma de ferramentas como Burp Suite e Charles! Ver, pausar e modificar o
-tráfego entre um cliente e um servidor — mas sem interface gráfica: tudo por
-linha de comando.
+**English** | [Português](/7awsn/byproxy/blob/main/README.pt-br.md)
 
-O encaminhamento é escrito à mão em cima da biblioteca padrão do Python. Para
-HTTPS o proxy termina a conexão TLS do cliente usando uma autoridade
-certificadora local, inspeciona a requisição e reabre a conexão com o destino.
+A console HTTP/HTTPS intercepting proxy that runs entirely in the terminal.
+Same idea as tools like Burp Suite and Charles: view, pause and modify the
+traffic between a client and a server, but with no GUI, all from the command
+line.
 
-> Use apenas em dispositivos e ambientes que você tem autorização para testar.
+Forwarding is written by hand on top of the Python standard library. For HTTPS
+the proxy terminates the client's TLS connection using a local certificate
+authority, inspects the request and opens a fresh connection to the target.
 
-## Arquitetura
+> Use only on devices and environments you are authorized to test.
+
+## Architecture
 
 ```
-   cliente (navegador / curl)
+   client (browser / curl)
             │
             ▼
-   ┌───────────────────┐        captura   ┌────────────┐
-   │     byproxy        │ ───────────────▶ │  histórico  │
-   │  captura → pausa   │                  └────────────┘
-   │  → modifica → envia│ ◀───┐
-   └───────────────────┘      │ pausa (interceptação)
+   ┌───────────────────┐        capture   ┌────────────┐
+   │     byproxy        │ ───────────────▶ │  history    │
+   │  capture → pause   │                  └────────────┘
+   │  → modify → send   │ ◀───┐
+   └───────────────────┘      │ pause (interception)
             │                 │
-            ▼            console interativo
-   servidor de destino
+            ▼           interactive console
+       target server
 ```
 
-- **Captura**: método, URL, cabeçalhos e corpo da requisição; status, cabeçalhos
-  e corpo da resposta.
-- **Interceptação**: pausa a requisição, deixa editar cabeçalhos/parâmetros/corpo
-  e então encaminha (ou descarta).
-- **Inspeção**: histórico em tabela, filtro por URL, detalhe de um flow e
-  salvar/carregar a sessão em JSON.
+- **Capture**: request method, URL, headers and body; response status, headers
+  and body.
+- **Interception**: pause a request, edit headers/params/body, then forward
+  (or drop) it.
+- **Inspection**: history table, filter by URL, detail of a flow, and
+  save/load the session as JSON.
 
-## Instalação
+## Installation
 
 ```bash
 pip install -e .
 ```
 
-Requer Python 3.10+.
+Requires Python 3.10+.
 
-## Uso
+## Usage
 
-Inicie o proxy e o console:
+Start the proxy and the console:
 
 ```bash
 byproxy start --host 127.0.0.1 --port 8080
 ```
 
-Aponte o cliente para `127.0.0.1:8080`. Por exemplo, com `curl`:
+Point the client at `127.0.0.1:8080`. For example, with `curl`:
 
 ```bash
-curl -x http://127.0.0.1:8080 http://exemplo.com/
+curl -x http://127.0.0.1:8080 http://example.com/
 ```
 
-Dentro do console:
+Inside the console:
 
 ```
-byproxy> history            # lista o tráfego
-byproxy> inspect 3          # detalhe do flow 3
-byproxy> filter login       # só URLs com "login"
-byproxy> intercept on       # passa a pausar requisições
-byproxy> queue              # lista as pausadas
-byproxy> set-header 5 User-Agent curl/8.0   # edita direto no console
+byproxy> history            # list the traffic
+byproxy> inspect 3          # detail of flow 3
+byproxy> filter login       # only URLs containing "login"
+byproxy> intercept on       # start pausing requests
+byproxy> queue              # list the paused ones
+byproxy> set-header 5 User-Agent curl/8.0   # edit right in the console
 byproxy> set-body 5 {"user":"admin"}
-byproxy> forward 5          # encaminha
-byproxy> save sessao.json   # salva a sessão
+byproxy> forward 5          # forward it
+byproxy> save session.json  # save the session
 ```
 
-A requisição pausada pode ser editada direto no console (`set-method`,
-`set-path`, `set-header`, `set-body`) ou aberta por completo num editor
-externo com `edit <#>`.
+A paused request can be edited right in the console (`set-method`, `set-path`,
+`set-header`, `set-body`) or opened in full in an external editor with
+`edit <#>`.
 
 ### HTTPS
 
-Para inspecionar HTTPS o cliente precisa confiar na CA local. O caminho do
-certificado aparece ao iniciar o proxy (ou rode `byproxy ca-path`); importe-o
-como autoridade confiável no sistema ou no navegador. Enquanto a CA não for
-confiada, conexões HTTPS vão falhar no handshake, isso é esperado.
+To inspect HTTPS the client must trust the local CA. The certificate path is
+shown when the proxy starts (or run `byproxy ca-path`); import it as a trusted
+authority in the system or browser. Until the CA is trusted, HTTPS connections
+will fail the handshake, which is expected.
 
 ```bash
-byproxy ca-path   # mostra onde está o certificado da CA
+byproxy ca-path   # show the CA certificate path
 ```
 
-## Testar localmente
+## Testing locally
 
-Um servidor de eco acompanha o projeto. Ele devolve em JSON tudo que recebe,
-o que ajuda a confirmar que suas edições chegaram ao destino:
+An echo server ships with the project. It returns everything it receives as
+JSON, which helps confirm your edits reached the target:
 
 ```bash
 python examples/test_server.py
-# em outro terminal:
+# in another terminal:
 curl -x http://127.0.0.1:8080 http://127.0.0.1:9000/
 ```
 
-## Comandos do console
+## Console commands
 
-| Comando | O que faz |
+| Command | What it does |
 | --- | --- |
-| `history` / `ls` | lista o tráfego capturado |
-| `inspect <#>` | mostra requisição e resposta |
-| `filter <texto>` | filtra o histórico pela URL |
-| `intercept on\|off` | liga/desliga a pausa de requisições |
-| `queue` | lista as requisições pausadas |
-| `edit <#>` | edita uma requisição pausada no editor externo |
-| `set-method <#> <m>` | troca o método da requisição pausada |
-| `set-path <#> <caminho>` | troca o caminho/query da requisição pausada |
-| `set-header <#> <nome> [valor]` | define (ou remove, sem valor) um header |
-| `set-body <#> [texto]` | troca o corpo (vazio limpa) |
-| `forward <#>` / `forward all` | encaminha requisição(ões) pausada(s) |
-| `drop <#>` | descarta uma requisição pausada |
-| `save` / `load <arquivo>` | salva/carrega a sessão em JSON |
-| `clear` | limpa o histórico |
-| `ca` | mostra o caminho do certificado da CA |
-| `quit` / `exit` | encerra |
+| `history` / `ls` | list captured traffic |
+| `inspect <#>` | show request and response |
+| `filter <text>` | filter history by URL |
+| `intercept on\|off` | toggle pausing of requests |
+| `queue` | list paused requests |
+| `edit <#>` | edit a paused request in an external editor |
+| `set-method <#> <m>` | change the method of a paused request |
+| `set-path <#> <path>` | change the path/query of a paused request |
+| `set-header <#> <name> [value]` | set (or remove, if no value) a header |
+| `set-body <#> [text]` | replace the body (empty clears it) |
+| `forward <#>` / `forward all` | forward paused request(s) |
+| `drop <#>` | drop a paused request |
+| `save` / `load <file>` | save/load the session as JSON |
+| `clear` | clear the history |
+| `ca` | show the CA certificate path |
+| `quit` / `exit` | exit |
 
-## Testes
+## Tests
 
 ```bash
 pip install -e ".[dev]"
 pytest
 ```
 
-## Licença
+## License
 
-MIT. Veja [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
